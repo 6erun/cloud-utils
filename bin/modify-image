@@ -1,5 +1,8 @@
 #!/bin/bash
 
+VERBOSITY=0
+# verbosity arguments for mount-image-callback
+MIC_VERBOSITY_ARG=""
 # Default values
 DEFAULT_SIZE="20G"
 
@@ -15,8 +18,17 @@ usage() {
     echo "  -r: Script to execute"
     echo "  -i: Interactive mode"
     echo "  -h: Show this help message"
+    echo "  -v: Increase verbosity (higher level passed to mount-image-callback)"
     exit 1
 }
+
+debug() {
+	local level="$1"; shift;
+	[ "${level}" -gt "${VERBOSITY}" ] && return
+	error "${@}"
+}
+
+error() { echo "$@" 1>&2; }
 
 resize_image() {
     local filename=$1
@@ -38,7 +50,7 @@ run_command() {
     local filename=$1
     local command=$2
 
-    echo "Running command: mount-image-callback --system-resolvconf '${filename}' -- chroot _MOUNTPOINT_ ${command}"
+    debug 1 "Running command: mount-image-callback --system-resolvconf '${filename}' -- chroot _MOUNTPOINT_ ${command}"
     sudo mount-image-callback --system-resolvconf --system-mounts "${filename}" -- chroot _MOUNTPOINT_ /bin/bash -c "${command}"
 }
 
@@ -46,7 +58,7 @@ run_command_script() {
     local filename=$1
     local script=$2
 
-    echo "Running script: ${script}"
+    debug 1 "Running script: ${script}"
     # Create a temporary directory to mount the image
     local mount_point=$(mktemp -d)
 
@@ -59,7 +71,7 @@ run_command_script() {
         # Execute the script in chroot
         chroot '${mount_point}' /bin/bash /tmp/script.sh
     " || {
-        echo "Script execution failed: ${script}"
+        error "Script execution failed: ${script}"
         return 1
     }
 }
@@ -68,10 +80,11 @@ run_interactive_mode() {
     local filename=$1
     local fname
     fname=$(basename "$filename")
-    
-    echo "Entering interactive mode..."
+  
+    debug 1 "Entering interactive mode..."
     # Start an interactive shell
-    sudo mount-image-callback --system-resolvconf --system-mounts "${filename}" -- chroot _MOUNTPOINT_ env PS1="[\u@\h | ${fname}:\w]\\$ " /bin/bash --norc -i
+    sudo mount-image-callback ${MIC_VERBOSITY_ARG} --system-resolvconf --system-mounts "${filename}" -- chroot _MOUNTPOINT_ env PS1="[\u@\h | ${fname}:\w]\\$ " /bin/bash --norc -i
+
 }
 
 # Parse command line options
@@ -81,7 +94,7 @@ COMMAND=""
 SCRIPT=""
 INTERACTIVE=false
 
-while getopts "s:f:c:r:ih" opt; do
+while getopts "s:f:c:r:ihv" opt; do
     case ${opt} in
         s)
             SIZE=$OPTARG
@@ -98,32 +111,38 @@ while getopts "s:f:c:r:ih" opt; do
         i)
             INTERACTIVE=true
             ;;
+        v)
+            VERBOSITY=$((VERBOSITY + 1))
+            ;;
         h|?)
             usage
             ;;
     esac
 done
 
+[ "${VERBOSITY}" -gt 1 ] && MIC_VERBOSITY_ARG="-$(printf 'v%.0s' $(seq 1 $((VERBOSITY - 1))))"
+
+
 # Check if mandatory filename parameter is provided
 if [ -z "${FILENAME}" ]; then
-    echo "Error: filename (-f) parameter is mandatory."
+    error "Error: filename (-f) parameter is mandatory."
     usage
 fi
 
 if [ -n "${SIZE}" ]; then
-    echo "Resizing image to ${SIZE}"
+    debug 1 "Resizing image to ${SIZE}"
     resize_image "${FILENAME}" "${SIZE}"
 fi
 
 # Execute command if provided
 if [ -n "${COMMAND}" ]; then
-    run_command "${FILENAME}" "${COMMAND}" || { echo "Command failed, exiting script."; exit 1; }
+    run_command "${FILENAME}" "${COMMAND}" || { error "Command failed, exiting script."; exit 1; }
     #eval "${COMMAND}"
 fi
 
 # Execute script if provided
 if [ -n "${SCRIPT}" ]; then
-    run_command_script "${FILENAME}" "${SCRIPT}" || { echo "Script failed, exiting script."; exit 1; }
+    run_command_script "${FILENAME}" "${SCRIPT}" || { error "Script failed, exiting script."; exit 1; }
 fi
 
 # Interactive mode
