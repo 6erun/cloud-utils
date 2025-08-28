@@ -22,6 +22,7 @@ Usage: ${0##*/} [ options ] file
     -c: Command to execute
     -r: Script to execute
     -i: Interactive mode
+    -b: Backup input file before processing
     -h: Show this help message
     -v: Increase verbosity (higher level passed to mount-image-callback)
 EOF
@@ -98,10 +99,11 @@ modify_image() {
     # Parse command line options
     local size=""     #"${DEFAULT_SIZE}"
     local command="", script="", interactive=false
+    local backup=false
     local filename="$1"
 
-	short_opts="s:c:r:ihv"
-	long_opts="size:,command:,script:,interactive,help,verbose"
+	short_opts="s:c:r:ibhv"
+	long_opts="size:,command:,script:,interactive,backup,help,verbose"
 	getopt_out=$(getopt -n "${0##*/}" \
 		-o "${short_opts}" -l "${long_opts}" -- "$@") &&
 		eval set -- "${getopt_out}" ||
@@ -125,6 +127,9 @@ modify_image() {
             -i|--interactive)
                 interactive=true
                 ;;
+            -b|--backup)
+                backup=true
+                ;;
             -v|--verbose)
                 VERBOSITY=$((VERBOSITY + 1))
                 ;;
@@ -137,11 +142,17 @@ modify_image() {
 
     [ "${VERBOSITY}" -gt 1 ] && MIC_VERBOSITY_ARG="-$(printf 'v%.0s' $(seq 1 $((VERBOSITY - 1))))"
 
-
     # Check if mandatory filename parameter is provided
     if [ -z "${filename}" ]; then
         error "Error: filename (-f) parameter is mandatory."
         bad_Usage
+    fi
+
+    # Backup file if requested
+    if [ "${backup}" = true ]; then
+        local backup_file="${filename}.bak"
+        debug 1 "Backing up '${filename}' to '${backup_file}'"
+        cp -- "${filename}" "${backup_file}" || { error "Backup failed, exiting script."; exit 1; }
     fi
 
     if [ -n "${size}" ]; then
