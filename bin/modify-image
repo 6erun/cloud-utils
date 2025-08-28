@@ -9,18 +9,25 @@ DEFAULT_SIZE="20G"
 # example usage:
 # ./modify-image -f jammy-server-cloudimg-amd64.img -r script-driver-570.txt
 
-# Function to display usage
-usage() {
-    echo "Usage: $0 -f filename [-s size] [-c command] [-r script] [-i]"
-    echo "  -s: Image size (default: ${DEFAULT_SIZE})"
-    echo "  -f: Image filename)"
-    echo "  -c: Command to execute"
-    echo "  -r: Script to execute"
-    echo "  -i: Interactive mode"
-    echo "  -h: Show this help message"
-    echo "  -v: Increase verbosity (higher level passed to mount-image-callback)"
-    exit 1
+Usage() {
+	cat <<EOF
+Usage: ${0##*/} [ options ] file
+
+   supported 'file' are:
+      file      : any disk format supported by qemu-nbd
+
+   options:
+    -s: Image size (default: ${DEFAULT_SIZE})
+    -f: Image filename
+    -c: Command to execute
+    -r: Script to execute
+    -i: Interactive mode
+    -h: Show this help message
+    -v: Increase verbosity (higher level passed to mount-image-callback)
+EOF
 }
+
+bad_Usage() { Usage 1>&2; [ $# -eq 0 ] || error "$@"; exit 1; }
 
 debug() {
 	local level="$1"; shift;
@@ -87,65 +94,76 @@ run_interactive_mode() {
 
 }
 
-# Parse command line options
-SIZE=""     #"${DEFAULT_SIZE}"
-FILENAME=""
-COMMAND=""
-SCRIPT=""
-INTERACTIVE=false
+modify_image() {
+    # Parse command line options
+    local size=""     #"${DEFAULT_SIZE}"
+    local command="", script="", interactive=false
+    local filename="$1"
 
-while getopts "s:f:c:r:ihv" opt; do
-    case ${opt} in
-        s)
-            SIZE=$OPTARG
-            ;;
-        f)
-            FILENAME=$OPTARG
-            ;;
-        c)
-            COMMAND=$OPTARG
-            ;;
-        r)
-            SCRIPT=$OPTARG
-            ;;
-        i)
-            INTERACTIVE=true
-            ;;
-        v)
-            VERBOSITY=$((VERBOSITY + 1))
-            ;;
-        h|?)
-            usage
-            ;;
-    esac
-done
+	short_opts="s:c:r:ihv"
+	long_opts="size:,command:,script:,interactive,help,verbose"
+	getopt_out=$(getopt -n "${0##*/}" \
+		-o "${short_opts}" -l "${long_opts}" -- "$@") &&
+		eval set -- "${getopt_out}" ||
+		{ bad_Usage; return 1; }
 
-[ "${VERBOSITY}" -gt 1 ] && MIC_VERBOSITY_ARG="-$(printf 'v%.0s' $(seq 1 $((VERBOSITY - 1))))"
+	while [ $# -ne 0 ]; do
+		cur=${1}; next=${2};
+		case "$cur" in
+            -s|--size)
+                size=$next
+                shift
+                ;;
+            -c|--command)
+                command=$next
+                shift
+                ;;
+            -r|--script)
+                script=$next
+                shift
+                ;;
+            -i|--interactive)
+                interactive=true
+                ;;
+            -v|--verbose)
+                VERBOSITY=$((VERBOSITY + 1))
+                ;;
+            -h|--help)
+                Usage ; exit 0
+                ;;
+        esac
+        shift;
+    done
+
+    [ "${VERBOSITY}" -gt 1 ] && MIC_VERBOSITY_ARG="-$(printf 'v%.0s' $(seq 1 $((VERBOSITY - 1))))"
 
 
-# Check if mandatory filename parameter is provided
-if [ -z "${FILENAME}" ]; then
-    error "Error: filename (-f) parameter is mandatory."
-    usage
-fi
+    # Check if mandatory filename parameter is provided
+    if [ -z "${filename}" ]; then
+        error "Error: filename (-f) parameter is mandatory."
+        bad_Usage
+    fi
 
-if [ -n "${SIZE}" ]; then
-    debug 1 "Resizing image to ${SIZE}"
-    resize_image "${FILENAME}" "${SIZE}"
-fi
+    if [ -n "${size}" ]; then
+        debug 1 "Resizing image to ${size}"
+        resize_image "${filename}" "${size}"
+    fi
 
-# Execute command if provided
-if [ -n "${COMMAND}" ]; then
-    run_command "${FILENAME}" "${COMMAND}" || { error "Command failed, exiting script."; exit 1; }
-    #eval "${COMMAND}"
-fi
+    # Execute command if provided
+    if [ -n "${command}" ]; then
+        run_command "${filename}" "${command}" || { error "Command failed, exiting script."; exit 1; }
+        #eval "${COMMAND}"
+    fi
 
-# Execute script if provided
-if [ -n "${SCRIPT}" ]; then
-    run_command_script "${FILENAME}" "${SCRIPT}" || { error "Script failed, exiting script."; exit 1; }
-fi
+    # Execute script if provided
+    if [ -n "${script}" ]; then
+        run_command_script "${filename}" "${script}" || { error "Script failed, exiting script."; exit 1; }
+    fi
 
-# Interactive mode
-if [ "${INTERACTIVE}" = true ]; then
-    run_interactive_mode "${FILENAME}"
-fi
+    # Interactive mode
+    if [ "${interactive}" = true ]; then
+        run_interactive_mode "${filename}"
+    fi
+}
+
+modify_image "$@"
