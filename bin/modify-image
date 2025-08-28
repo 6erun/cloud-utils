@@ -98,7 +98,7 @@ run_interactive_mode() {
 modify_image() {
     # Parse command line options
     local size=""     #"${DEFAULT_SIZE}"
-    local command="", script="", interactive=false
+    local command="" script="" interactive=false
     local backup=false
     local filename="$1"
 
@@ -112,39 +112,28 @@ modify_image() {
 	while [ $# -ne 0 ]; do
 		cur=${1}; next=${2};
 		case "$cur" in
-            -s|--size)
-                size=$next
-                shift
-                ;;
-            -c|--command)
-                command=$next
-                shift
-                ;;
-            -r|--script)
-                script=$next
-                shift
-                ;;
-            -i|--interactive)
-                interactive=true
-                ;;
-            -b|--backup)
-                backup=true
-                ;;
-            -v|--verbose)
-                VERBOSITY=$((VERBOSITY + 1))
-                ;;
-            -h|--help)
-                Usage ; exit 0
-                ;;
+            -s|--size) size=$next;;
+            -c|--command) command=$next;;
+            -r|--script) script=$next;;
+            -i|--interactive) interactive=true;;
+            -b|--backup) backup=true;;
+            -v|--verbose) VERBOSITY=$((VERBOSITY + 1));;
+            -h|--help) Usage ; exit 0;;
+            --) shift; break ;;
         esac
         shift;
     done
 
+    [ $# -ge 1 ] || { bad_Usage "must provide image"; return 1; }
+
     [ "${VERBOSITY}" -gt 1 ] && MIC_VERBOSITY_ARG="-$(printf 'v%.0s' $(seq 1 $((VERBOSITY - 1))))"
+
+	filename="$1"
+	shift 1
 
     # Check if mandatory filename parameter is provided
     if [ -z "${filename}" ]; then
-        error "Error: filename (-f) parameter is mandatory."
+        error "Error: filename parameter is mandatory."
         bad_Usage
     fi
 
@@ -162,17 +151,20 @@ modify_image() {
 
     # Execute command if provided
     if [ -n "${command}" ]; then
+        debug 1 "Executing command: ${command}"
         run_command "${filename}" "${command}" || { error "Command failed, exiting script."; exit 1; }
         #eval "${COMMAND}"
     fi
 
     # Execute script if provided
     if [ -n "${script}" ]; then
+        debug 1 "Executing script: ${script}"
         run_command_script "${filename}" "${script}" || { error "Script failed, exiting script."; exit 1; }
     fi
 
     # Interactive mode
     if [ "${interactive}" = true ]; then
+        debug 1 "Entering interactive mode..."
         run_interactive_mode "${filename}"
     fi
 }
