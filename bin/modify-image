@@ -46,8 +46,15 @@ resize_image() {
 
     sudo modprobe nbd max_part=10
     sudo qemu-nbd -c /dev/nbd0 "${filename}"
-    gparted /dev/nbd0
 
+    # WARNING: we assume that partition 1 is the root partition
+    # Resize the partition to use all available space
+    sudo parted /dev/nbd0 --fix --script resizepart 1 100%
+    # Re-read partition table
+    sudo partprobe /dev/nbd0
+    sudo e2fsck -f /dev/nbd0p1
+    sudo resize2fs /dev/nbd0p1
+    # gparted /dev/nbd0
     # disconnect device
     sudo qemu-nbd -d /dev/nbd0
     # remove module
