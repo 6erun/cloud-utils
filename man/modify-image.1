@@ -1,0 +1,64 @@
+.TH modify-image 1 "28 Aug 2025" cloud-utils "cloud-utils"
+.SH NAME
+modify-image \- modify, resize, and run commands/scripts on disk images
+
+.SH SYNOPSIS
+.BI "modify-image [ options ] IMAGE"
+
+.SH OPTIONS
+.TP
+.B -s, --size SIZE
+Resize the image to SIZE (e.g., 20G)
+.TP
+.B -c, --command COMMAND
+Command to execute inside the image (chrooted)
+.TP
+.B -r, --script SCRIPT
+Script file to execute inside the image (chrooted)
+.TP
+.B -i, --interactive
+Start an interactive shell inside the image (chrooted)
+.TP
+.B -b, --backup
+Backup the input file before processing
+.TP
+.B -h, --help
+Show this help message
+.TP
+.B -v, --verbose
+Increase verbosity (can be used multiple times)
+.TP
+.B IMAGE
+Target disk image file (any format supported by qemu-nbd)
+
+.SH DESCRIPTION
+.PP
+.B modify-image
+is a utility to resize, modify, and run commands or scripts inside a disk image file. It supports resizing the image, executing arbitrary commands or scripts in a chrooted environment, and launching an interactive shell. The script uses qemu-nbd and mount-image-callback to access and modify the image.
+
+.SH EXAMPLES
+.TP
+Resize an image to 40G:
+.B modify-image -s 40G myimage.img
+.TP
+Run a command inside the image:
+.B modify-image -c "apt update" myimage.img
+.TP
+Run a script inside the image:
+.B modify-image -r myscript.sh myimage.img
+.TP
+Start an interactive shell inside the image:
+.B modify-image -i myimage.img
+
+.SH SEE ALSO
+.PD 0
+.TP
+.BR qemu-nbd (8),
+.BR mount-image-callback (1),
+.BR parted (8),
+.BR resize2fs (8)
+
+.SH AUTHOR
+This manpage was written for the cloud-utils package. Permission is granted to copy, distribute and/or modify this document under the terms of the GNU General Public License, Version 3 published by the Free Software Foundation.
+
+On Debian systems, the complete text of the GNU General Public License can be found in /usr/share/common-licenses/GPL.
