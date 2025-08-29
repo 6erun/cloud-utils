@@ -64,7 +64,7 @@ resize_image() {
     echo "Resized partition 1 to 100%"
     # Re-read partition table
     sudo partprobe -s /dev/nbd0
-    sudo e2fsck -f /dev/nbd0p1
+    sudo e2fsck -y -f /dev/nbd0p1
     sudo resize2fs /dev/nbd0p1
     echo "Filesystem resized. Partition free space:"
     sudo parted /dev/nbd0p1 --script print free
