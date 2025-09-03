@@ -80,7 +80,7 @@ run_command() {
     local command=$2
 
     debug 1 "Running command: ${command}"
-    sudo mount-image-callback --system-resolvconf --system-mounts --efi "${filename}" -- chroot _MOUNTPOINT_ /bin/bash -c "${command}"
+    sudo mount-image-callback --system-resolvconf --system-mounts --boot --efi "${filename}" -- chroot _MOUNTPOINT_ /bin/bash -c "${command}"
 }
 
 run_command_script() {
@@ -92,7 +92,7 @@ run_command_script() {
     local mount_point=$(mktemp -d)
 
     # Mount the image
-    sudo mount-image-callback --system-resolvconf --system-mounts --efi "${filename}" --mountpoint "${mount_point}" -- bash -c "
+    sudo mount-image-callback --system-resolvconf --system-mounts --boot --efi "${filename}" --mountpoint "${mount_point}" -- bash -c "
         # Copy the script to the mounted environment
         cp '${script}' '${mount_point}/tmp/script.sh'
         # Make it executable
@@ -112,7 +112,7 @@ run_interactive_mode() {
   
     debug 1 "Entering interactive mode..."
     # Start an interactive shell
-    sudo mount-image-callback ${MIC_VERBOSITY_ARG} --system-resolvconf --system-mounts "${filename}" -- chroot _MOUNTPOINT_ env PS1="[\u@\h | ${fname}:\w]\\$ " /bin/bash --norc -i
+    sudo mount-image-callback ${MIC_VERBOSITY_ARG} --system-resolvconf --system-mounts --boot --efi "${filename}" -- chroot _MOUNTPOINT_ env PS1="[\u@\h | ${fname}:\w]\\$ " /bin/bash --norc -i
 
 }
 

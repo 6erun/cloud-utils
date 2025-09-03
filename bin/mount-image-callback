@@ -42,6 +42,7 @@ Usage: ${0##*/} [ options ] file cmd [ args ]
                                if 'auto', then mount part 1 if image is
                                partitioned otherwise mount image
          --efi                 mount EFI partition if it exists
+         --boot                mount boot partition if it exists
     -p | --proc                bind mount /proc
     -s | --sys                 bind mount /sys
     -d | --dev                 bind mount /dev
@@ -367,9 +368,10 @@ mount_callback_umount() {
 	local cd_mountpoint=false fmt="" overlay=false rwmode="rw"
 	local img_mp=""
 	local mount_efi=false
+	local mount_boot=false
 
 	short_opts="Cdhm:P:psSv"
-	long_opts="cd-mountpoint,dev,help,format:,mountpoint:,overlay,partition:,proc,read-only,sys,system-mounts,system-resolvconf,verbose,efi"
+	long_opts="cd-mountpoint,dev,help,format:,mountpoint:,overlay,partition:,proc,read-only,sys,system-mounts,system-resolvconf,verbose,efi,boot"
 	getopt_out=$(getopt -n "${0##*/}" \
 		-o "${short_opts}" -l "${long_opts}" -- "$@") &&
 		eval set -- "${getopt_out}" ||
@@ -393,6 +395,7 @@ mount_callback_umount() {
 			   --opts) opts="${opts} $next"; shift;;
 			   --read-only) readonly=true; rwmode="ro";;
 			--efi) mount_efi=true;;
+			--boot) mount_boot=true;;
 			--) shift; break;;
 		esac
 		shift;
@@ -483,8 +486,9 @@ mount_callback_umount() {
 		debug 1 "mounted $bindmp to $mp${bindmp}"
 	done
 
-	# Handle EFI partition detection
-	if $mount_efi; then
+	# Handle boot partition detection
+	# Has to be before EFI
+	if $mount_boot; then
 		get_boot_partition "$_RET_NBD"
 		local boot_ptnum="$_RET"
 		if [ -n "$boot_ptnum" ]; then
@@ -499,7 +503,10 @@ mount_callback_umount() {
 			error "boot partition not found in $img"
 			return 1
 		fi
+	fi
 
+	# Handle EFI partition detection
+	if $mount_efi; then
 		get_efi_partition "$_RET_NBD"
 		local efi_ptnum="$_RET"		
 		if [ -n "$efi_ptnum" ]; then
