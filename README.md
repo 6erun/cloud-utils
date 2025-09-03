@@ -21,6 +21,7 @@ The package is also available in Alpine and Arch as `cloud-utils`.
 * `ec2metadata` - query and display AWS EC2 metadata
 * `growpart` - rewrite partition table so that partition takes up all the space it can
 * `mount-image-callback` - mount a file to a temporary mount point and then invoke the provided cmd with args
+* `modify-image` - modify a disk image (e.g., change size, execute commands or scripts, etc.)
 * `resize-part-image` - resize a partition image and contained filesystem to a new size
 * `ubuntu-cloudimage-query` - get the latest Ubuntu AWS AMI meeting certain criteria
 * `vcs-run` - obtain a repository and execute a command with arguments
