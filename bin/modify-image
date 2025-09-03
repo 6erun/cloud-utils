@@ -79,8 +79,8 @@ run_command() {
     local filename=$1
     local command=$2
 
-    debug 1 "Running command: mount-image-callback --system-resolvconf '${filename}' -- chroot _MOUNTPOINT_ ${command}"
-    sudo mount-image-callback --system-resolvconf --system-mounts "${filename}" -- chroot _MOUNTPOINT_ /bin/bash -c "${command}"
+    debug 1 "Running command: ${command}"
+    sudo mount-image-callback --system-resolvconf --system-mounts --efi "${filename}" -- chroot _MOUNTPOINT_ /bin/bash -c "${command}"
 }
 
 run_command_script() {
@@ -92,7 +92,7 @@ run_command_script() {
     local mount_point=$(mktemp -d)
 
     # Mount the image
-    sudo mount-image-callback --system-resolvconf --system-mounts "${filename}" --mountpoint "${mount_point}" -- bash -c "
+    sudo mount-image-callback --system-resolvconf --system-mounts --efi "${filename}" --mountpoint "${mount_point}" -- bash -c "
         # Copy the script to the mounted environment
         cp '${script}' '${mount_point}/tmp/script.sh'
         # Make it executable

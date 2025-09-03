@@ -41,6 +41,7 @@ Usage: ${0##*/} [ options ] file cmd [ args ]
     -P | --partition PARTNUM   mount partition PARTNUM (default 'auto')
                                if 'auto', then mount part 1 if image is
                                partitioned otherwise mount image
+         --efi                 mount EFI partition if it exists
     -p | --proc                bind mount /proc
     -s | --sys                 bind mount /sys
     -d | --dev                 bind mount /dev
@@ -154,6 +155,22 @@ get_partition() {
 	else
 		_RET=0
 	fi
+}
+
+get_efi_partition() {
+	local img="$1"
+	local out
+	out=$(lsblk -lnp -o NAME,FSTYPE,LABEL,SIZE,MOUNTPOINT "$img")
+	debug 2 "$out"
+	_RET=$(echo "$out" | awk '$2 == "vfat" { print $1 }')
+}
+
+get_boot_partition() {
+	local img="$1"
+	local out
+	out=$(lsblk -lnp -o NAME,FSTYPE,LABEL,SIZE,MOUNTPOINT "$img")
+	debug 2 "$out"
+	_RET=$(echo "$out" | awk '$2 == "ext4" && $3 == "BOOT" { print $1 }')
 }
 
 add_bin() {
@@ -349,9 +366,10 @@ mount_callback_umount() {
 	local opts="" bmounts="" system_resolvconf=false ptnum=auto
 	local cd_mountpoint=false fmt="" overlay=false rwmode="rw"
 	local img_mp=""
+	local mount_efi=false
 
 	short_opts="Cdhm:P:psSv"
-	long_opts="cd-mountpoint,dev,help,format:,mountpoint:,overlay,partition:,proc,read-only,sys,system-mounts,system-resolvconf,verbose"
+	long_opts="cd-mountpoint,dev,help,format:,mountpoint:,overlay,partition:,proc,read-only,sys,system-mounts,system-resolvconf,verbose,efi"
 	getopt_out=$(getopt -n "${0##*/}" \
 		-o "${short_opts}" -l "${long_opts}" -- "$@") &&
 		eval set -- "${getopt_out}" ||
@@ -374,6 +392,7 @@ mount_callback_umount() {
 			-v|--verbose) VERBOSITY=$((${VERBOSITY}+1));;
 			   --opts) opts="${opts} $next"; shift;;
 			   --read-only) readonly=true; rwmode="ro";;
+			--efi) mount_efi=true;;
 			--) shift; break;;
 		esac
 		shift;
@@ -463,6 +482,39 @@ mount_callback_umount() {
 		UMOUNTS[${#UMOUNTS[@]}]="$mp${bindmp}"
 		debug 1 "mounted $bindmp to $mp${bindmp}"
 	done
+
+	# Handle EFI partition detection
+	if $mount_efi; then
+		get_boot_partition "$_RET_NBD"
+		local boot_ptnum="$_RET"
+		if [ -n "$boot_ptnum" ]; then
+			debug 1 "boot partition found: partition $boot_ptnum"
+			mkdir -p "$mp/boot" ||
+				{ error "failed mkdir $mp/boot"; return 1; }
+			mount $boot_ptnum "$mp/boot" ||
+				{ error "failed mount boot partition $boot_ptnum"; return 1; }
+			UMOUNTS[${#UMOUNTS[@]}]="$mp/boot"
+			debug 1 "mounted $boot_ptnum to $mp/boot"
+		else
+			error "boot partition not found in $img"
+			return 1
+		fi
+
+		get_efi_partition "$_RET_NBD"
+		local efi_ptnum="$_RET"		
+		if [ -n "$efi_ptnum" ]; then
+			debug 1 "EFI partition found: partition $efi_ptnum"
+			mkdir -p "$mp/boot/efi" ||
+				{ error "failed mkdir $mp/boot/efi"; return 1; }
+			mount $efi_ptnum "$mp/boot/efi" ||
+				{ error "failed mount efi partition $efi_ptnum"; return 1; }
+			UMOUNTS[${#UMOUNTS[@]}]="$mp/boot/efi"
+			debug 1 "mounted $efi_ptnum to $mp/boot/efi"
+		else
+			error "EFI partition not found in $img"
+			return 1
+		fi
+	fi
 
 	if ${system_resolvconf}; then
 		local rcf="$mp/etc/resolv.conf"
