@@ -500,8 +500,7 @@ mount_callback_umount() {
 			UMOUNTS[${#UMOUNTS[@]}]="$mp/boot"
 			debug 1 "mounted $boot_ptnum to $mp/boot"
 		else
-			error "boot partition not found in $img"
-			return 1
+			error "WARNING: boot partition not found in $img"
 		fi
 	fi
 
@@ -518,8 +517,7 @@ mount_callback_umount() {
 			UMOUNTS[${#UMOUNTS[@]}]="$mp/boot/efi"
 			debug 1 "mounted $efi_ptnum to $mp/boot/efi"
 		else
-			error "EFI partition not found in $img"
-			return 1
+			error "WARNING: EFI partition not found in $img"
 		fi
 	fi
 
